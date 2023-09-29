@@ -2,7 +2,9 @@
 
 #libraries
 library(bayesnec)
+library(plyr)
 library(dplyr)
+library(tidyverse)
 library(ggplot2)
 library(glmmTMB)
 library(drc)
@@ -352,7 +354,7 @@ df1.cat$raw.x = as.numeric(as.character(df1.cat$rawx.cat))
 # save(exp_1, file = "bnec.w.mil.qp.RData")
 # .rs.restartR()
 #plot(exp_1$fit)
-load("./Rdata/bnec.w.mil.qp.RData")
+load("./Rdata2/bnec.w.mil.qp.RData")
 #plot(exp_1)
 
 # data.m.y = data1.s$yel %>% dplyr::mutate(log_x = log10(dli))
@@ -388,7 +390,7 @@ p3 = p3 + facet_wrap(~spec, nrow = 1)
 p3
 
 #save(p3, file = file.path("./Rdata", "p3_qp_mil.RData"))
-load("./Rdata2/p3_qp_mil.RData")
+load("./Rdata/p3_qp_mil.RData")
 
 # ##########NPQ#########################################
 # # data.n = dplyr::select (data1,c('disc', 'No.','Y(NPQ)1','Y(NPQ)2', 'Y(NPQ)3', 'rawx.cat'))  #remove column

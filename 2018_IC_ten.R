@@ -567,42 +567,42 @@ load("./Rdata/p4_qp_ten.RData")
 
 
 ########kinetic######################
-setwd("C:/Users/gricardo/OneDrive - Australian Institute of Marine Science/3 Results/6 Post-settlement/2 2018/2018 lab/3 PAM/210119 ic/IC R/kinetic")
-
-#Imprt
-read_csv_filename <- function(filename){
-    ret <- read_delim(filename, delim = ';')
-    ret$Source <- filename #EDIT
-    ret
-}
-filenames = list.files(full.names = TRUE)
-data2 <- ldply(filenames, read_csv_filename)
-
-#2)Organising and wrangling
-str(data2) #check data type is correct
-data2$Time <- as.numeric(as.character(data2$Time))
-data2$F1 <- as.numeric(as.character(data2$F1))
-data2$F2 <- as.numeric(as.character(data2$F2))
-data2$F3 <- as.numeric(as.character(data2$F3))
-
-data2 = select (data2,-c(X4,X3,X5))  #remove column
-data2.s = split(data2, data2$Source)
-data2_long = data2 %>% pivot_longer(-c(Time,Source),  names_to = "rep" ,values_to = "meas")  #keep year, add all other colums to Ecoregion, add all their values to area)
-data2_long <- data2_long[order(data2_long$Source),]
-
-#3)#Visualize data - plot data split at every factor
-library(ggplot2)
-source("C:/Users/gricardo/OneDrive - Australian Institute of Marine Science/R/1 my functions/theme sleek.R")
-theme_set(theme_sleek2())
-
-#plot one
-# p0 = ggplot()+geom_line(data2.s$`./ten t8 19 IC_kinetic.csv`, mapping = aes(x = Time, y = F1), size = 1 )+theme_sleek2()
-# # p0 = p0 + facet_wrap(~Source+rep)
+# setwd("C:/Users/gricardo/OneDrive - Australian Institute of Marine Science/3 Results/6 Post-settlement/2 2018/2018 lab/3 PAM/210119 ic/IC R/kinetic")
+# 
+# #Imprt
+# read_csv_filename <- function(filename){
+#     ret <- read_delim(filename, delim = ';')
+#     ret$Source <- filename #EDIT
+#     ret
+# }
+# filenames = list.files(full.names = TRUE)
+# data2 <- ldply(filenames, read_csv_filename)
+# 
+# #2)Organising and wrangling
+# str(data2) #check data type is correct
+# data2$Time <- as.numeric(as.character(data2$Time))
+# data2$F1 <- as.numeric(as.character(data2$F1))
+# data2$F2 <- as.numeric(as.character(data2$F2))
+# data2$F3 <- as.numeric(as.character(data2$F3))
+# 
+# data2 = select (data2,-c(X4,X3,X5))  #remove column
+# data2.s = split(data2, data2$Source)
+# data2_long = data2 %>% pivot_longer(-c(Time,Source),  names_to = "rep" ,values_to = "meas")  #keep year, add all other colums to Ecoregion, add all their values to area)
+# data2_long <- data2_long[order(data2_long$Source),]
+# 
+# #3)#Visualize data - plot data split at every factor
+# library(ggplot2)
+# source("C:/Users/gricardo/OneDrive - Australian Institute of Marine Science/R/1 my functions/theme sleek.R")
+# theme_set(theme_sleek2())
+# 
+# #plot one
+# # p0 = ggplot()+geom_line(data2.s$`./ten t8 19 IC_kinetic.csv`, mapping = aes(x = Time, y = F1), size = 1 )+theme_sleek2()
+# # # p0 = p0 + facet_wrap(~Source+rep)
+# # p0
+# 
+# 
+# p0 = ggplot()+geom_line(data2_long, mapping = aes(x = Time, y = meas), size = 1 )+theme_sleek2()
+# p0 = p0 + facet_wrap(~Source+rep)
 # p0
-
-
-p0 = ggplot()+geom_line(data2_long, mapping = aes(x = Time, y = meas), size = 1 )+theme_sleek2()
-p0 = p0 + facet_wrap(~Source+rep)
-p0
-
+# 
 

@@ -414,7 +414,7 @@ p8 = p8 + scale_color_manual( values = c("grey50","gold"))
 p8 = p8 + geom_line(data = df7, aes(x =  dli, y = mPAR) , color = 'grey60',size=1, linetype = "dashed")
 p8 = p8 + facet_wrap(~spec, nrow = 1)
 p8
-#ddssd
+
 
 #save(p8, file = file.path("./Rdata", "p8_Em_ten.RData"))
 load("./Rdata/p8_Em_ten.RData") 

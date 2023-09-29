@@ -123,7 +123,7 @@ df1.cat$raw.x = as.numeric(as.character(df1.cat$rawx.cat))
 # save(exp_1, file = file.path(filepath, "bnec.w.mil.dy.RData"))
 # .rs.restartR()
 # #plot(exp_1$fit)
-load("./Rdata/bnec.w.mil.dy.RData")
+load("./Rdata2/bnec.w.mil.dy.RData")
 plot(exp_1)
 
 # data.m.y = data1.s$yel %>% dplyr::mutate(log_x = log10(dli))
@@ -134,7 +134,7 @@ plot(exp_1)
 # 
 # save(exp_2, file = file.path(filepath, "bnec.y.mil.dy.RData"))
 #.rs.restartR()
-load("./Rdata/bnec.y.mil.dy.RData")
+load("./Rdata2/bnec.y.mil.dy.RData")
 plot(exp_2)
 
 #bind together
@@ -363,7 +363,7 @@ load("./Rdata/bnec.w.mil.qp.RData")
 # .rs.restartR()
 # #plot(exp_2$fit)
 # plot(exp_2)
-load("./Rdata/bnec.y.mil.qp.RData")
+load("./Rdata2/bnec.y.mil.qp.RData")
 
 #bind together
 exp_1$pred_vals$data$spec = 'whi'
@@ -388,7 +388,7 @@ p3 = p3 + facet_wrap(~spec, nrow = 1)
 p3
 
 #save(p3, file = file.path("./Rdata", "p3_qp_mil.RData"))
-load("./Rdata/p3_qp_mil.RData")
+load("./Rdata2/p3_qp_mil.RData")
 
 # ##########NPQ#########################################
 # # data.n = dplyr::select (data1,c('disc', 'No.','Y(NPQ)1','Y(NPQ)2', 'Y(NPQ)3', 'rawx.cat'))  #remove column

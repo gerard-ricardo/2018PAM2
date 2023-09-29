@@ -275,7 +275,7 @@ df1.cat$raw.x = as.numeric(as.character(df1.cat$rawx.cat))
 # save(exp_1, file = "bnec.w.ten.ek.RData")
 # .rs.restartR()
 # #plot(exp_1$fit)
-load("./Rdata/bnec.w.ten.ek.RData")
+load("./Rdata2/bnec.w.ten.ek.RData")
 #plot(exp_1)
 
 # data.m.y = data2.s$yel %>% dplyr::mutate(log_x = log10(dli))
@@ -285,7 +285,7 @@ load("./Rdata/bnec.w.ten.ek.RData")
 # save(exp_2, file = "bnec.y.ten.ek.RData")
 # .rs.restartR()
 # #plot(exp_2$fit)
-load("./Rdata/bnec.y.ten.ek.RData")
+load("./Rdata2/bnec.y.ten.ek.RData")
 #plot(exp_2)
 
 #bind together
@@ -373,7 +373,7 @@ df1.cat$raw.x = as.numeric(as.character(df1.cat$rawx.cat))
 # save(exp_1, file = "bnec.w.ten.em.RData")  #restart R!
 # .rs.restartR()
 # #plot(exp_1$fit)
-load("./Rdata/bnec.w.ten.em.RData")
+load("./Rdata2/bnec.w.ten.em.RData")
 #plot(exp_1)
 
 # data.m.y = data2.s$yel %>% dplyr::mutate(log_x = log10(dli))
@@ -383,7 +383,7 @@ load("./Rdata/bnec.w.ten.em.RData")
 # save(exp_2, file = "bnec.y.ten.em.RData")
 # .rs.restartR()
 # #plot(exp_2$fit)
-load("./Rdata/bnec.y.ten.em.RData")
+load("./Rdata2/bnec.y.ten.em.RData")
 #plot(exp_2)
 
 #bind together

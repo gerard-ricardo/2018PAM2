@@ -1,0 +1,223 @@
+---
+title: "Tidy Fitting of Fluorescence Light Curve Data in R"
+author: "Matthew R Nitschke"
+date: "23/03/2021"
+---
+
+# Import Packages
+
+```{r}
+# Libraries for plotting and being tidy
+library(tidyverse) # https://www.tidyverse.org/packages/
+library(broom) # https://cran.r-project.org/web/packages/broom/vignettes/broom.html
+library(lubridate) # https://lubridate.tidyverse.org/
+
+# Libraries for fitting curves
+library(nls.multstart) # https://github.com/padpadpadpad/nls.multstart
+library(nlstools)
+```
+
+# 1 Data imports
+
+## 1.1 Import and clean PAM data. Calculate fluorescence parameters.
+
+```{r}
+meta <- read.table(file="https://raw.githubusercontent.com/gerard-ricardo/data/master/postset%20treat%20mil", header= TRUE,dec=",", na.strings=c("",".","NA"))
+
+fn <- list.files(c("rlc_mil_csvs/", "rlc_ten_csvs/"), pattern = ".csv", full.names = TRUE)
+
+processed <- data.frame()
+
+for(i in 1:length(fn)){
+temp_data <- read_csv(fn[i]) %>% # reads the ith file
+  select(PAR, starts_with("F")) %>%
+  select(-starts_with("Fo")) %>%
+  pivot_longer(F1:last_col(), names_to = "parameter_idx", values_to = "values") %>%
+  mutate(curve_id = str_remove_all(parameter_idx, "F|Fm|m'|Y|II|\\(|\\)")) %>%
+  mutate(parameter = str_remove_all(parameter_idx, "[0-9]")) %>%
+  filter(!is.na(values)) %>%
+  arrange(curve_id, parameter_idx, PAR) %>%
+  select(-parameter_idx) %>%
+  pivot_wider(names_from = parameter, values_from = values) %>%
+  mutate(file_name = fn[i])
+  
+  processed <- rbind(processed, temp_data)
+}
+
+raw_data <- processed %>%
+  group_by(file_name, curve_id) %>%
+  mutate(unique_id = cur_group_id()) %>%
+  rename(Fm = "Fm'") %>%
+  mutate(disc = str_remove_all(file_name, "rlc_mil_csvs/|rlc_ten_csvs/")) %>%
+  mutate(disc = word(disc, sep = " ")) %>%
+  left_join(., meta) %>%
+  filter(!is.na(spp)) %>% # m085 has no meta
+  filter(dli != "na") %>% # not sure what these are
+  mutate(dli = as.numeric(dli))
+```
+
+```{r}
+pb_data <- raw_data %>%
+  group_by(unique_id) %>%
+  mutate(Fm = ifelse(Fm <= F, F+0.01, Fm), # There should not be any Fm values < F
+         PAR = ifelse(PAR == 0, 0.001, PAR), # PAR values = 0 may result in infinite values during fitting
+         FqFm = (Fm - F)/Fm, # Quantum yield of PSII
+         Fo.p = first(F) / (first(FqFm) + (first(F)/Fm)), # Fo'
+         onemC = (Fm - F)/(Fm - Fo.p), # [1 - C]
+         Fv.p = Fm - Fo.p, # Fv'
+         onemQ = (Fv.p/Fm)/first(FqFm)) %>% # [1 - Q]
+  mutate(FqFm = case_when(FqFm == 0 ~ 0.001, TRUE ~ FqFm)) %>%
+  ungroup()
+```
+
+```{r}
+# Sanity check: PAR count across dataset for any missing data
+par_count <- pb_data %>% 
+  group_by(PAR) %>%
+  count(PAR, sort = TRUE) # there are 16 curves with a par value of 337.000
+```
+
+## QC RAW data
+
+```{r}
+pb_clean <- pb_data %>%
+  mutate(QC = case_when(unique_id == 9 & PAR == 611 ~ "remove",
+                        unique_id == 10 & PAR == 611 ~ "remove", 
+                        unique_id == 31 & PAR == 611 ~ "remove",
+                        unique_id == 32 & PAR == 611 ~ "remove", 
+                        unique_id == 33 & PAR == 611 ~ "remove", 
+                        TRUE ~ "keep")) %>% # curves 9, 10, 31, 32, 33 have an anomalous value at PAR = 611, why?
+  filter(QC == "keep") %>%
+  group_by(unique_id) %>%
+  slice(which.max(FqFm):which.min(FqFm)) %>% # very suspicious of curves that bottom out then start to increase later at higher PAR values
+  ungroup()
+
+pb_clean %>%
+  ggplot(aes(PAR, FqFm)) +
+  geom_point(size = 2, shape = 21, fill = "blue", alpha = 0.5) +
+  facet_wrap(~ unique_id, ncol = 20) + 
+  theme(legend.position = "right", aspect.ratio = 1) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  guides(fill = guide_legend(override.aes = list(size = 3, shape = c(21)))) +
+  labs(x = expression(paste("E (", mu,"mol photons m"^-2*" s"^-1*")")), 
+       y = 'Fq/Fm (dimensionless) +- SE')
+```
+
+# 2. Fitting of light curve data
+
+## 2.1 FqFm vs E (PAR): Define the equation
+
+```{r}
+# Define the Hennige et al 2008 FqFm equation
+Hennige <- function(FqFmmax, Ek, x) {
+  model <- ((FqFmmax*Ek)*(1-exp(-x/Ek)))/x
+  return(model)
+}
+```
+
+## 2.2 Fit the FqFm LC using purrr::map across groups
+
+```{r}
+# Fit the quantum yield against the PAR data 
+FqFmfits <- pb_clean %>%
+  group_by(., unique_id, disc, spp, dli, spec ) %>% # any metadata that needs to be propagated forward
+  nest() %>%
+  mutate(fit = purrr::map(data, ~ nls_multstart(FqFm ~ Hennige(FqFmmax, Ek, x = PAR),
+                     data = .x,
+                     iter = 250,
+                     start_lower = c(FqFmmax = 0.05, Ek = 5),
+                     start_upper = c(FqFmmax = 0.95, Ek = 500),
+                     supp_errors = 'Y',
+                     convergence_count = 100,
+                     na.action = na.omit,
+                     lower = c(FqFmmax = 0.05, Ek = 5))))
+
+```
+
+## 2.3 Tidy the fits and generate 95% confidence intervals of parameters
+
+```{r}
+# get summary
+FqFminfo <- FqFmfits %>%
+  mutate(summary = map(fit, glance)) %>%
+  unnest(summary)
+
+# get parameters
+FqFmparams <- FqFmfits %>%
+  mutate(., p = map(fit, tidy)) %>%
+  unnest(p)
+
+# get confidence intervals
+FqFmCI <- FqFmfits %>%
+  mutate(., cis = map(fit, confint2),
+         cis = map(cis, data.frame)) %>%
+  unnest(cis) %>%
+  rename(., conf.low = X2.5.., conf.high = X97.5..) %>%
+  group_by(., unique_id) %>%
+  mutate(., term = c('FqFmmax', 'Ek')) %>%
+  ungroup() %>%
+  select(., -data, -fit)
+
+# merge parameters and CI estimates
+FqFmparams <- merge(FqFmparams, FqFmCI, by = intersect(names(FqFmparams), names(FqFmCI)))
+
+# Create long PAR list
+new_preds <- pb_clean %>%
+  do(., data.frame(PAR = seq(min(.$PAR), max(.$PAR), length.out = 200), stringsAsFactors = FALSE))
+
+# Augment predictions from fits
+predictions <- FqFmfits %>%
+  mutate(., p = map(fit, augment, newdata = new_preds)) %>%
+  unnest(p) %>%
+  rename(., FqFm = .fitted) %>%
+  group_by(unique_id) %>%
+  mutate(prediction_id = cur_group_id()) %>%
+  select(-fit, -data)
+```
+
+## 2.4 Plot of FqFm and fits
+
+```{r}
+ggplot() +
+  geom_vline(aes(xintercept = estimate), FqFmparams %>% filter(term == "Ek")) +
+  geom_rect(aes(xmin = conf.low, xmax = conf.high, ymin = 0, ymax = Inf), fill = "red", alpha = 0.5, FqFmparams %>% filter(term == "Ek")) +
+  geom_line(aes(PAR, FqFm, group = prediction_id), col = "black", alpha = 0.5, predictions) +
+  geom_point(aes(PAR, FqFm, fill = dli), size = 2, shape = 21, alpha = 0.8, pb_clean) +
+  facet_grid(vars(spp), vars(spec)) +
+  #scale_x_continuous(trans = 'log10') +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_viridis_c(option = "magma") +
+  theme(legend.position = "right", aspect.ratio = 1) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  guides(fill = guide_legend(override.aes = list(size = 3, shape = c(21)))) +
+  ggtitle("Fq/Fm versus E with model fit ((FqFmmax*Ek)*(1-exp(-x/Ek)))/x") +
+  labs(x = expression(paste("E (", mu,"mol photons m"^-2*" s"^-1*")")), 
+       y = 'Fq/Fm (dimensionless) +- SE')
+```
+
+## 2.5 Plot the variance of the paramters
+
+```{r}
+FqFmparams %>%
+  ggplot(aes(dli, estimate)) + 
+  geom_point(aes(fill = spec), shape = 21, size = 2) +
+  facet_grid(vars(term), vars(spp), scales = "free") +
+  theme(aspect.ratio = 1) +
+  scale_fill_manual(values = c("white", "yellow"))
+```
+
+# 3. Light dependant dynamic quenching
+
+## 3.1 Visualise 1 - C vs 1 - Q
+
+```{r}
+pb_clean %>%
+  ggplot(aes(onemC, onemQ, group = unique_id)) +
+  geom_path(aes(colour = dli)) +
+  #geom_point(aes(fill = PAR), shape = 21, size = 3) +
+  facet_grid(vars(spp), vars(spec)) +
+  #scale_fill_viridis_c(option = "magma") + # Requires viridis package
+  #scale_shape_manual(values = c(21, 22)) +
+  geom_abline(slope = 1) +
+  theme(aspect.ratio = 1)
+```

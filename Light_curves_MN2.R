@@ -371,6 +371,7 @@ FqFmparams %>%
 #vice versa.
 str(pb_clean)
 spec_names <- c('whi'="Broad",'yel'="Shifted", 'mil' = "A. millepora", 'ten' = "A. tenuis")
+#pb_clean = pb_clean %>% filter(dli < 2)
 (p5 = pb_clean %>%
   ggplot(aes(x = onemC, y = onemQ, group = unique_id)) +
   geom_path(aes(colour = dli)) +
@@ -382,8 +383,8 @@ spec_names <- c('whi'="Broad",'yel'="Shifted", 'mil' = "A. millepora", 'ten' = "
   #              spec = label_bquote(.(spec) == "whi" ~ "Broad" ~ .(spec) == "yel" ~ "Shifted")
   #            )) +
   # scale_fill_viridis_c(option = "magma") + # Requires viridis package
-  scale_colour_viridis_c(option = "magma", direction = -1) + # Adjust color gradient
-  # scale_shape_manual(values = c(21, 22)) +
+    scale_colour_gradientn(colors = viridis::viridis(256, option = "plasma"), values = scales::rescale(c(0.01, 3, 8.7))) +
+    # scale_shape_manual(values = c(21, 22)) +
   geom_abline(slope = 1, linetype = "dashed") +    #equilibrium
   theme(aspect.ratio = 1) +
   theme_minimal() +

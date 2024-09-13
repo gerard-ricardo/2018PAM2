@@ -129,7 +129,7 @@ df1.cat$raw.x <- as.numeric(as.character(df1.cat$rawx.cat))
 # save(exp_1, file = file.path(filepath, "bnec.w.mil.dy.RData"))
 # #.rs.restartR()
 # plot(exp_1$fit)
-load("./Rdata2/bnec.w.mil.dy.RData")
+load("./Rdata2/bnec.w.mil.dy.RData")  #exp_1
 plot(exp_1)
 
 
@@ -195,7 +195,7 @@ p1 <- p1 + scale_fill_manual(values = c("grey", "yellow"))
 p1 <- p1 + scale_color_manual(values = c("grey50", "gold")) + facet_wrap(~spec)
 p1
 # save(p1, file = file.path("./Rdata", "p1_fvfm_mil.RData"))
-load("./Rdata/p1_fvfm_mil.RData")
+load("./Rdata/p1_fvfm_mil.RData")  #p1
 
 # Visualize data - plot data split at every factor
 # p0 = ggplot()+geom_point(data.y3.long, mapping = aes(x = dli, y = prop),position = position_jitter(width = .02), alpha = 0.50,size = 3 )+theme_sleek2()

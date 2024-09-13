@@ -7,7 +7,7 @@
 # - !might be issue with dark treatment, make sure the same for each one
 
 ## For the quenching by E/Ek
-# 1 - C 'represents the proportion of excitation energy used to drive photochemistry as the fraction of open reaction centers.'
+# 1 - C 'represents the proportion of excitation energy used to drive photochemistry as the fraction of open reaction centers.' i.e qP
 # [1 – Q] describes the dynamic non-photochemical quenching (Q) thatis equivalent to the excitation pressure over PSII
 #' These parameters decrease over the course of the RLC as they become active or are “utilized'
 #'
@@ -63,9 +63,11 @@ raw_data <- processed %>%
   filter(dli != "na") %>% # not sure what these are
   mutate(dli = as.numeric(dli))
 
+
+
 # label. Add equations. This might be the modern Fv/Fm equation seen in Nitchke
 pb_data <- raw_data %>%
-  group_by(unique_id) %>%
+  group_by(id2) %>%
   mutate(
     Fm = ifelse(Fm <= F, F + 0.01, Fm), # There should not be any Fm values < F
     PAR = ifelse(PAR == 0, 0.001, PAR), # PAR values = 0 may result in infinite values during fitting
@@ -97,6 +99,19 @@ pb_clean <- pb_data %>%
   group_by(unique_id) %>%
   slice(which.max(FqFm):which.min(FqFm)) %>% # very suspicious of curves that bottom out then start to increase later at higher PAR values
   ungroup()
+pb_clean %>%  group_by(id2, spec)  #88 groups
+
+pb_clean %>% filter(dli == '0.01') %>% distinct(id2) 
+#6 dark for mil, 5 for ten
+
+#duplicate dark whi for yel as they are the same treatment
+dark1 = pb_clean %>% filter(dli == '0.01' & spec == 'whi') %>%  mutate(spec = 'yel') #duplicate whi dark
+dark2 =pb_clean %>% filter(dli == '0.01' & spec == 'yel') %>%  mutate(spec = 'whi')  #duplicate whi dark
+pb_clean = rbind(pb_clean, dark1, dark2)
+pb_clean %>%  group_by(id2, spec)  #99 groups shows 
+unique(pb_clean$PAR)
+pb_clean = pb_clean %>% dplyr::filter(PAR < 930)  #filter of last light as things go weird
+
 
 # plot of Fq/Fm by E for every individual
 pb_clean %>%
@@ -166,18 +181,33 @@ FqFmparams <- FqFmfits %>%
   mutate(., p = map(fit, tidy)) %>%
   unnest(p)
 
+FqFmfits
+
 # get confidence intervals
+# FqFmCI <- FqFmfits %>%
+#   mutate(.,
+#     cis = map(fit, confint2),
+#     cis = map(cis, data.frame)
+#   ) %>%
+#   unnest(cis) %>%
+#   rename(., conf.low = X2.5.., conf.high = X97.5..) %>%
+#   group_by(., unique_id) %>%
+#   mutate(., term = c("FqFmmax", "Ek")) %>%
+#   ungroup() %>%
+#   select(., -data, -fit)
+
 FqFmCI <- FqFmfits %>%
   mutate(.,
-    cis = map(fit, confint2),
-    cis = map(cis, data.frame)
+         cis = map(fit, confint2),
+         cis = map(cis, data.frame)
   ) %>%
   unnest(cis) %>%
   rename(., conf.low = X2.5.., conf.high = X97.5..) %>%
   group_by(., unique_id) %>%
-  mutate(., term = c("FqFmmax", "Ek")) %>%
+  mutate(., term = rep(c("FqFmmax", "Ek"), length.out = n())) %>%  # Repeat the terms to match the group size
   ungroup() %>%
   select(., -data, -fit)
+
 
 # merge parameters and CI estimates (for both species)
 FqFmparams <- merge(FqFmparams, FqFmCI, by = intersect(names(FqFmparams), names(FqFmCI)))
@@ -200,7 +230,7 @@ p0 <- p0 + geom_point(data = Ek_mil3, aes(x = estimate, y = Ek, alpha = 0.8), co
 p0 <- p0 + geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") # Adds y=x line
 p0 <- p0 + labs(
   x = expression(Ek ~ from ~ "Fq'/Fm'"),
-  y = expression(EK ~ from ~ "Platt's equation"))
+  y = expression(Ek ~ from ~ "Platt's equation"))
 p0 <- p0 + scale_x_continuous(breaks = c(0, 20, 40, 60, 80)) # Set x-axis breaks
 p0 <- p0 + scale_y_continuous(breaks = c(0, 20, 40, 60, 80)) # Set y-axis breaks
 p0 <- p0 + theme_sleek2()
@@ -208,6 +238,9 @@ p0 <- p0 + theme(legend.position = "none")
 p0 <- p0 + guides(color = "none") # this removes excesse legends
 p0 <- p0 + annotate("text", x = 60, y = 10, label = parse(text = label_text), col = "black")
 p0
+
+#save(p0, file = file.path("./Rdata", "platts_vs_fqfm_Ek.pdf.RData"))
+load("./Rdata/platts_vs_fqfm_Ek.pdf.RData")
 
 # ggsave(p0, filename = 'platts_vs_fqfm_Ek.pdf',  path = "./plots", device = 'pdf',  width = 6, height = 6)  #
 
@@ -265,16 +298,43 @@ predictions <- FqFmfits %>%
 str(FqFmparams)
 FqFmparams$id2
 
+#combined plots
+spec.names <- c('mil'="A. millepora",'ten'="A. tenuis", 'Ek' = 'Ek', 'FqFmmax'  = 'FqFmmax' )
 FqFmparams %>%
   select(c(id2, dli, spec, spp, term, estimate)) %>%
   ggplot(aes(dli, estimate)) +
-  geom_point(aes(fill = spec), shape = 21, size = 2) +
+  geom_point(aes(fill = spec), alpha = 0.5, shape = 21, size = 2, position = position_jitter( width = .05)) +
   geom_smooth(aes(group = spec, color = spec), method = "gam", formula = y ~ s(x,  k = 3), se = FALSE) + # Adding GAM smoothing for each spec
-  facet_grid(vars(term), vars(spp), scales = "free") +
+  # p0= p0+ facet_wrap(~spec, nrow = 2, labeller  = as_labeller(spec.names))
+  facet_grid(vars(term), vars(spp), scales = "free", labeller = as_labeller(spec.names))+
+theme(aspect.ratio = 1) +
+  scale_fill_manual(values = c("white", "yellow")) +
+  scale_color_manual(values = c("grey50", "yellow3")) +
+  scale_x_log10()+
+  labs(
+  x = expression(Daily ~ light ~ integrals ~ (mol ~ photons ~ "m"^{2} ~ "d"^{-1})),
+  y = expression(Estimate))
+
+# just Ek
+spec.names <- c('mil'="A. millepora",'ten'="A. tenuis" )
+
+p1 = FqFmparams %>%
+  filter(term == "Ek") %>%  # Replace "term1" with the actual term you want to plot
+  select(c(id2, dli, spec, spp, term, estimate)) %>%
+  ggplot(aes(dli, estimate)) +
+  geom_point(aes(fill = spec), alpha = 0.5, shape = 21, size = 2, position = position_jitter( width = .05)) +
+  geom_smooth(aes(group = spec, color = spec), method = "gam", formula = y ~ s(x,  k = 3), se = FALSE) + 
+  facet_grid(cols = vars(spp), scales = "free", labeller = as_labeller(spec.names)) +
   theme(aspect.ratio = 1) +
   scale_fill_manual(values = c("white", "yellow")) +
   scale_color_manual(values = c("grey50", "yellow3")) +
-  scale_x_log10()
+  scale_x_log10() +
+  labs(
+    x = expression(Daily ~ light ~ integrals ~ (mol ~ photons ~ "m"^{2} ~ "d"^{-1})),
+    y = expression(Ek)
+  )
+#save(p1, file = file.path("./Rdata", "platts_vs_fqfm_Ek.pdf.RData"))
+load("./Rdata/platts_vs_fqfm_Ek.pdf.RData")
 
 #this matches Fig. 8 mostly. Also matches trends in Hennige Fig 3
 #so it supports that trends Ek used in the intial analysis is correct
@@ -307,14 +367,20 @@ FqFmparams %>%
   scale_x_log10() +
   scale_fill_manual(values = c("white", "yellow"))
 
-# 3. Light dependant dynamic quenching
-## 3.1 Visualise 1 - C vs 1 - Q i.e photochemical abd nonphotechemical quenching. Values above the abline indicate qP and vice versa.
+# 3. Light dependant dynamic quenching. 1 - C vs 1 - Q i.e photochemical abd nonphotechemical quenching. Values below?above the abline indicate qP and
+#vice versa.
 str(pb_clean)
-pb_clean %>%
+spec_names <- c('whi'="Broad",'yel'="Shifted", 'mil' = "A. millepora", 'ten' = "A. tenuis")
+(p5 = pb_clean %>%
   ggplot(aes(x = onemC, y = onemQ, group = unique_id)) +
   geom_path(aes(colour = dli)) +
   geom_point(aes(fill = PAR), shape = 21, size = 3) +
-  facet_grid(vars(spp), vars(spec)) +
+  facet_grid(vars(spp), vars(spec), labeller  = as_labeller(spec_names)) +
+  # facet_grid(vars(spp) ~ vars(spec), 
+  #            labeller = labeller(
+  #              spp = label_bquote(.(spp) == "mil" ~ "A. millepora" ~ .(spp) == "ten" ~ "A. tenuis"),
+  #              spec = label_bquote(.(spec) == "whi" ~ "Broad" ~ .(spec) == "yel" ~ "Shifted")
+  #            )) +
   # scale_fill_viridis_c(option = "magma") + # Requires viridis package
   scale_colour_viridis_c(option = "magma", direction = -1) + # Adjust color gradient
   # scale_shape_manual(values = c(21, 22)) +
@@ -323,10 +389,27 @@ pb_clean %>%
   theme_minimal() +
   labs(
     x = "Photochemical quenching (1 - C)", # Replace with the appropriate label for onemC
+    colour = 'DLI',
     y = "Nonphotochemical quenching (1 - Q)"  # Replace with the appropriate label for onemQ
+  ))
+
+#ggsave(p5, filename = 'qP_vs_NPQ.tiff',  path = "./plots", device = "tiff",  width = 6, height = 6)  #make sure to have .tiff on filename
+
+
+# Filter for PAR > 500 and calculate the standard deviation (SD) of onemQ for each combination of spp and spec
+pb_clean_filtered_sd <- pb_clean %>%
+  filter(PAR > 500) %>%  # Filter rows where PAR > 500
+  group_by(spp, spec) %>%  # Group by species (spp) and spectral treatment (spec)
+  summarise(
+    sd_onemQ = sd(onemQ, na.rm = TRUE)  # Calculate the standard deviation of onemQ for each group
   )
 
-#
+# Display the result
+pb_clean_filtered_sd
+
+
+
+
 
 unique(pb_clean$dli)
 
